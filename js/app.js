@@ -1,7 +1,7 @@
 /**
  * Milk Tracker - Frontend Logic & Settlement Engine
  */
-
+const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbxZvaRTLVbbhfRqFUPnOhMncc_y4WKPhbdrRu84pV6XTfs-5k_NKXWqQ4BerclonMHoxQ/exec"
 let selectedPresetQty = 1.0;
 let appState = {
   settings: {
@@ -68,7 +68,12 @@ function loadLocalState() {
     }
   }
 
-  document.getElementById("cfgApiUrl").value = appState.settings.apiUrl || "";
+  // Ensure default URL is used if empty or missing
+  if (!appState.settings.apiUrl || appState.settings.apiUrl.trim() === "") {
+    appState.settings.apiUrl = DEFAULT_API_URL;
+  }
+
+  document.getElementById("cfgApiUrl").value = appState.settings.apiUrl;
   document.getElementById("cfgRate").value = appState.settings.rate || 65;
   document.getElementById("cfgCycleDay").value = appState.settings.cycleDay || 15;
 }
