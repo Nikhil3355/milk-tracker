@@ -113,19 +113,36 @@ function closeModal(modal) {
   modal.classList.remove("open");
 }
 
-function handleSaveSettings() {
-  appState.settings.apiUrl = document.getElementById("cfgApiUrl").value.trim();
-  appState.settings.rate = Number(document.getElementById("cfgRate").value) || 65;
-  appState.settings.cycleDay = Number(document.getElementById("cfgCycleDay").value) || 15;
+async function handleSaveSettings() {
+  const rateVal = Number(document.getElementById("cfgRate").value) || 65;
+  const cycleVal = Number(document.getElementById("cfgCycleDay").value) || 15;
+  const apiUrlVal = document.getElementById("cfgApiUrl").value.trim();
+
+  appState.settings.apiUrl = apiUrlVal;
+  appState.settings.rate = rateVal;
+  appState.settings.cycleDay = cycleVal;
 
   saveLocalState();
   closeModal(settingsModal);
+  updateUI();
 
   if (appState.settings.apiUrl) {
-    fetchFromSheet();
-  } else {
-    syncStatus.innerText = "Local Mode (No Sheet URL configured)";
-    updateUI();
+    syncStatus.innerText = "Saving settings to Google Sheet...";
+    try {
+      await fetch(appState.settings.apiUrl, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "updateSettings",
+          rate: rateVal,
+          cycleDay: cycleVal
+        }),
+        headers: { "Content-Type": "text/plain;charset=utf-8" }
+      });
+      syncStatus.innerText = "Settings synced with Google Sheet ✓";
+    } catch (err) {
+      console.error(err);
+      syncStatus.innerText = "Saved locally (Sheet sync failed)";
+    }
   }
 }
 
@@ -141,9 +158,17 @@ async function fetchFromSheet() {
     if (data.success) {
       appState.deliveries = data.deliveries || [];
       appState.settlements = data.settlements || [];
-      if (data.settings && data.settings.rate) {
-        appState.settings.rate = Number(data.settings.rate);
-        document.getElementById("cfgRate").value = appState.settings.rate;
+      
+      // Sync settings from sheet
+      if (data.settings) {
+        if (data.settings.rate) {
+          appState.settings.rate = Number(data.settings.rate);
+          document.getElementById("cfgRate").value = appState.settings.rate;
+        }
+        if (data.settings.cycleDay) {
+          appState.settings.cycleDay = Number(data.settings.cycleDay);
+          document.getElementById("cfgCycleDay").value = appState.settings.cycleDay;
+        }
       }
       saveLocalState();
       syncStatus.innerText = "Synced with Google Sheet ✓";
