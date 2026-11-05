@@ -6,7 +6,7 @@ let selectedPresetQty = 1.0;
 let appState = {
   settings: {
     apiUrl: "",
-    rate: 65,
+    rate: 70,
     cycleDay: 15
   },
   deliveries: [],
