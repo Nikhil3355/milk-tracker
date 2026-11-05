@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Milk Tracker</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <span class="logo-icon">🥛</span>
+        <h1>Milk Tracker</h1>
+      </div>
+      <button class="icon-btn" id="openSettingsBtn" title="Settings" aria-label="Settings">⚙️</button>
+    </header>
+
+    <div class="status-banner" id="syncStatus">Local Mode (Configure Google Sheet in Settings)</div>
+
+    <!-- Live Running Bill Summary Card -->
+    <section class="card bill-card">
+      <div class="bill-meta" id="billPeriodLabel">Unbilled Running Amount</div>
+      <div class="bill-amount" id="billRunningAmount">₹0.00</div>
+      <div class="bill-stats">
+        <div class="stat-col">
+          <span class="stat-label">Total Volume</span>
+          <span class="stat-value" id="billRunningLiters">0.0 L</span>
+        </div>
+        <div class="stat-col">
+          <span class="stat-label">Current Rate</span>
+          <span class="stat-value" id="billRunningRate">₹65 / L</span>
+        </div>
+        <div class="stat-col">
+          <span class="stat-label">Unbilled Days</span>
+          <span class="stat-value" id="billRunningDays">0 Days</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Daily Logger Section -->
+    <section class="card">
+      <h2 class="card-title">Log Daily Milk</h2>
+      
+      <div class="form-group">
+        <label for="logDate">Delivery Date</label>
+        <input type="date" id="logDate" class="input-field">
+      </div>
+
+      <div class="form-group">
+        <label>Quantity Preset</label>
+        <div class="presets-grid">
+          <button type="button" class="preset-btn skip" data-qty="0">0 L</button>
+          <button type="button" class="preset-btn" data-qty="0.5">0.5 L</button>
+          <button type="button" class="preset-btn active" data-qty="1">1.0 L</button>
+          <button type="button" class="preset-btn" data-qty="1.5">1.5 L</button>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label for="customQty">Custom Liters</label>
+          <input type="number" step="0.1" min="0" id="customQty" class="input-field" placeholder="e.g. 2.0">
+        </div>
+        <div class="form-group flex-1">
+          <label for="logNotes">Note (optional)</label>
+          <input type="text" id="logNotes" class="input-field" placeholder="e.g. Guests">
+        </div>
+      </div>
+
+      <button type="button" class="btn btn-primary" id="saveEntryBtn">Save Entry</button>
+    </section>
+
+    <!-- Flexible Settlement / Calculation Section -->
+    <section class="card">
+      <h2 class="card-title">Settlement & Billing</h2>
+      <p class="section-desc">Calculate all unbilled deliveries up to your chosen cutoff date (e.g. 14th or 15th).</p>
+      
+      <div class="form-group">
+        <label for="cutoffDate">Cutoff Date</label>
+        <input type="date" id="cutoffDate" class="input-field">
+      </div>
+
+      <button type="button" class="btn btn-accent" id="calcBillBtn">⚡ Calculate Bill to Date</button>
+    </section>
+
+    <!-- Recent Deliveries List -->
+    <section class="card">
+      <div class="logs-header">
+        <h2 class="card-title" style="margin-bottom:0;">Recent Entries</h2>
+        <span class="logs-count" id="logsCount">0 total</span>
+      </div>
+      <ul class="logs-list" id="recentLogsList">
+        <li class="empty-state">No deliveries recorded yet.</li>
+      </ul>
+    </section>
+  </div>
+
+  <!-- Settlement Preview Modal -->
+  <div class="modal-backdrop" id="billModal">
+    <div class="modal-box">
+      <h3>Bill Calculation Preview</h3>
+      <div class="modal-row">
+        <span>Billing Window</span>
+        <strong id="modalPeriod">-</strong>
+      </div>
+      <div class="modal-row">
+        <span>Milk Received Days</span>
+        <strong id="modalMilkDays">0 days</strong>
+      </div>
+      <div class="modal-row">
+        <span>Skipped Days (0 L)</span>
+        <strong id="modalSkipDays">0 days</strong>
+      </div>
+      <div class="modal-row">
+        <span>Total Volume</span>
+        <strong id="modalTotalLiters">0.0 L</strong>
+      </div>
+      <div class="modal-row">
+        <span>Applied Rate</span>
+        <strong id="modalRate">₹0 / L</strong>
+      </div>
+      <div class="modal-row highlight">
+        <span>Total Payable</span>
+        <strong class="total-amount" id="modalGrandTotal">₹0.00</strong>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-muted" id="closeBillModalBtn">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmSettleBtn">Mark as Paid & Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-backdrop" id="settingsModal">
+    <div class="modal-box">
+      <h3>Configuration</h3>
+      
+      <div class="form-group">
+        <label for="cfgApiUrl">Google Apps Script Web App URL</label>
+        <input type="url" id="cfgApiUrl" class="input-field" placeholder="https://script.google.com/macros/s/.../exec">
+        <span class="help-text">Leave blank to use local browser storage only.</span>
+      </div>
+
+      <div class="form-group">
+        <label for="cfgRate">Milk Rate (₹ / Liter)</label>
+        <input type="number" id="cfgRate" class="input-field" value="65" min="1">
+      </div>
+
+      <div class="form-group">
+        <label for="cfgCycleDay">Billing Cycle Anchor Day</label>
+        <input type="number" id="cfgCycleDay" class="input-field" value="15" min="1" max="28">
+        <span class="help-text">Default cutoff day (e.g. 15 for 15th-to-15th cycle).</span>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-muted" id="closeSettingsModalBtn">Close</button>
+        <button type="button" class="btn btn-primary" id="saveSettingsBtn">Save & Sync</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
