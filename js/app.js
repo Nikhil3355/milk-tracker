@@ -1,19 +1,124 @@
 /**
  * Milk Tracker - Frontend Logic & Settlement Engine
  */
-const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbxZvaRTLVbbhfRqFUPnOhMncc_y4WKPhbdrRu84pV6XTfs-5k_NKXWqQ4BerclonMHoxQ/exec"
+
+// 1. Hardcode your Google Apps Script Web App URL here:
+const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbxZvaRTLVbbhfRqFUPnOhMncc_y4WKPhbdrRu84pV6XTfs-5k_NKXWqQ4BerclonMHoxQ/exec";
+
+// Translations Dictionary
+const translations = {
+  en: {
+    appTitle: "Milk Tracker",
+    langButtonText: "मराठी",
+    totalVolume: "Total Volume",
+    currentRate: "Current Rate",
+    unbilledDays: "Unbilled Days",
+    unbilledSince: "Unbilled deliveries since",
+    allSettled: "All prior days settled (₹0 due)",
+    logDailyMilk: "Log Daily Milk",
+    deliveryDate: "Delivery Date",
+    quantityPreset: "Quantity",
+    skipMilk: "0 L (Skipped)",
+    customLiters: "Custom Liters",
+    customPlaceholder: "e.g. 2.0",
+    noteLabel: "Note (optional)",
+    notePlaceholder: "e.g. Guests",
+    saveEntry: "Save Entry",
+    billingTitle: "Settlement & Billing",
+    billingDesc: "Calculate all unbilled deliveries up to your chosen cutoff date.",
+    cutoffDate: "Cutoff Date",
+    calcBillBtn: "⚡ Calculate Bill to Date",
+    recentEntries: "Recent Entries",
+    noEntries: "No deliveries recorded yet.",
+    billSummaryTitle: "Bill Calculation Preview",
+    modalPeriod: "Billing Window",
+    modalMilkDays: "Milk Received Days",
+    modalSkipDays: "Skipped Days (0 L)",
+    modalTotalLiters: "Total Volume",
+    modalRate: "Applied Rate",
+    modalGrandTotal: "Total Payable",
+    cancelBtn: "Cancel",
+    settleBtn: "Mark as Paid & Clear",
+    settingsTitle: "Configuration",
+    cfgApiUrl: "Google Apps Script Web App URL",
+    cfgRate: "Milk Rate (₹ / Liter)",
+    cfgCycleDay: "Billing Cycle Anchor Day",
+    closeBtn: "Close",
+    saveBtn: "Save & Sync",
+    badgeUnbilled: "UNBILLED",
+    badgeBilled: "PAID",
+    alertSaved: "Logged successfully for ",
+    alertSettled: "Bill successfully cleared and marked as paid!"
+  },
+  mr: {
+    appTitle: "दूध हिशोब",
+    langButtonText: "English",
+    totalVolume: "एकूण दूध",
+    currentRate: "दूध दर",
+    unbilledDays: "बाकी दिवस",
+    unbilledSince: "पासून बाकी असलेले दूध:",
+    allSettled: "मागील सर्व हिशोब पूर्ण आहे (₹0 बाकी)",
+    logDailyMilk: "रोजचे दूध नोंदवा",
+    deliveryDate: "तारीख",
+    quantityPreset: "प्रमाण (लिटर)",
+    skipMilk: "0 L (नाही घेतले)",
+    customLiters: "इतर लिटर",
+    customPlaceholder: "उदा. 2.0",
+    noteLabel: "टीप (पर्यायी)",
+    notePlaceholder: "उदा. पाहुणे आले",
+    saveEntry: "नोंद जतन करा",
+    billingTitle: "हिशोब आणि बिल",
+    billingDesc: "निवडलेल्या तारखेपर्यंतचा एकूण बाकी हिशोब आणि रक्कम काढा.",
+    cutoffDate: "हिशोबाची शेवटची तारीख",
+    calcBillBtn: "⚡ बिलाचा हिशोब करा",
+    recentEntries: "मागील नोंदी",
+    noEntries: "अद्याप कोणतीही नोंद नाही.",
+    billSummaryTitle: "बिलाचा तपशील",
+    modalPeriod: "हिशोबाचा कालावधी",
+    modalMilkDays: "दूध घेतलेले दिवस",
+    modalSkipDays: "दूध न घेतलेले दिवस (0 L)",
+    modalTotalLiters: "एकूण लिटर",
+    modalRate: "दर (प्रति लिटर)",
+    modalGrandTotal: "एकूण देय रक्कम",
+    cancelBtn: "रद्द करा",
+    settleBtn: "पैसे दिले (हिशोब पूर्ण करा)",
+    settingsTitle: "सेटिंग्ज",
+    cfgApiUrl: "गूगल शीट वेब ॲप लिंक",
+    cfgRate: "दूध दर (₹ / लिटर)",
+    cfgCycleDay: "हिशोब चक्र तारीख (उदा. 15)",
+    closeBtn: "बंद करा",
+    saveBtn: "जतन करा",
+    badgeUnbilled: "बाकी",
+    badgeBilled: "दिले",
+    alertSaved: "नोंद यशस्वीरित्या जतन झाली: ",
+    alertSettled: "बिल पूर्ण झाले आणि नोंदवले गेले!"
+  }
+};
+
+// Check saved preference; defaults strictly to 'mr' on any new device
+function getInitialLanguage() {
+  const saved = localStorage.getItem("milk_tracker_lang");
+  if (saved && (saved === "en" || saved === "mr")) {
+    return saved;
+  }
+  localStorage.setItem("milk_tracker_lang", "mr");
+  return "mr";
+}
+
+let currentLang = getInitialLanguage();
 let selectedPresetQty = 1.0;
+
 let appState = {
   settings: {
-    apiUrl: "",
-    rate: 70,
+    apiUrl: DEFAULT_API_URL,
+    rate: 65,
     cycleDay: 15
   },
   deliveries: [],
   settlements: []
 };
 
-// Elements
+// DOM references
 const logDateInput = document.getElementById("logDate");
 const customQtyInput = document.getElementById("customQty");
 const logNotesInput = document.getElementById("logNotes");
@@ -31,8 +136,7 @@ const logsCount = document.getElementById("logsCount");
 
 const billModal = document.getElementById("billModal");
 const settingsModal = document.getElementById("settingsModal");
-
-// Preset buttons
+const langToggleBtn = document.getElementById("langToggleBtn");
 const presetBtns = document.querySelectorAll(".preset-btn");
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -41,9 +145,10 @@ window.addEventListener("DOMContentLoaded", () => {
   cutoffDateInput.value = todayStr;
 
   loadLocalState();
+  applyLanguage(currentLang);
   setupEventListeners();
 
-  if (appState.settings.apiUrl) {
+  if (appState.settings.apiUrl && !appState.settings.apiUrl.includes("YOUR_DEPLOYMENT_ID")) {
     fetchFromSheet();
   } else {
     updateUI();
@@ -58,6 +163,36 @@ function getTodayISO() {
   return `${year}-${month}-${day}`;
 }
 
+// Language toggle and DOM replacement
+function applyLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem("milk_tracker_lang", lang);
+
+  const t = translations[lang];
+  if (!t) return;
+
+  if (langToggleBtn) {
+    langToggleBtn.innerText = t.langButtonText;
+  }
+
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const key = el.getAttribute("data-i18n");
+    if (t[key]) {
+      el.innerText = t[key];
+    }
+  });
+
+  if (customQtyInput) customQtyInput.placeholder = t.customPlaceholder;
+  if (logNotesInput) logNotesInput.placeholder = t.notePlaceholder;
+
+  updateUI();
+}
+
+function toggleLanguage() {
+  const nextLang = currentLang === "mr" ? "en" : "mr";
+  applyLanguage(nextLang);
+}
+
 function loadLocalState() {
   const cached = localStorage.getItem("milk_tracker_app_data");
   if (cached) {
@@ -68,8 +203,11 @@ function loadLocalState() {
     }
   }
 
-  // Ensure default URL is used if empty or missing
-  if (!appState.settings.apiUrl || appState.settings.apiUrl.trim() === "") {
+  if (!appState.settings) {
+    appState.settings = { apiUrl: DEFAULT_API_URL, rate: 65, cycleDay: 15 };
+  }
+
+  if (!appState.settings.apiUrl || appState.settings.apiUrl.includes("YOUR_DEPLOYMENT_ID")) {
     appState.settings.apiUrl = DEFAULT_API_URL;
   }
 
@@ -83,7 +221,10 @@ function saveLocalState() {
 }
 
 function setupEventListeners() {
-  // Preset buttons handling
+  if (langToggleBtn) {
+    langToggleBtn.addEventListener("click", toggleLanguage);
+  }
+
   presetBtns.forEach(btn => {
     btn.addEventListener("click", () => {
       presetBtns.forEach(b => b.classList.remove("active"));
@@ -98,12 +239,10 @@ function setupEventListeners() {
     selectedPresetQty = null;
   });
 
-  // Action buttons
   document.getElementById("saveEntryBtn").addEventListener("click", handleSaveEntry);
   document.getElementById("calcBillBtn").addEventListener("click", handleCalculatePreview);
   document.getElementById("confirmSettleBtn").addEventListener("click", handleConfirmSettlement);
 
-  // Modals
   document.getElementById("openSettingsBtn").addEventListener("click", () => openModal(settingsModal));
   document.getElementById("closeSettingsModalBtn").addEventListener("click", () => closeModal(settingsModal));
   document.getElementById("closeBillModalBtn").addEventListener("click", () => closeModal(billModal));
@@ -118,10 +257,10 @@ function closeModal(modal) {
   modal.classList.remove("open");
 }
 
-async function handleSaveSettings() {
+function handleSaveSettings() {
   const rateVal = Number(document.getElementById("cfgRate").value) || 65;
   const cycleVal = Number(document.getElementById("cfgCycleDay").value) || 15;
-  const apiUrlVal = document.getElementById("cfgApiUrl").value.trim();
+  const apiUrlVal = document.getElementById("cfgApiUrl").value.trim() || DEFAULT_API_URL;
 
   appState.settings.apiUrl = apiUrlVal;
   appState.settings.rate = rateVal;
@@ -131,31 +270,30 @@ async function handleSaveSettings() {
   closeModal(settingsModal);
   updateUI();
 
-  if (appState.settings.apiUrl) {
-    syncStatus.innerText = "Saving settings to Google Sheet...";
-    try {
-      await fetch(appState.settings.apiUrl, {
-        method: "POST",
-        body: JSON.stringify({
-          action: "updateSettings",
-          rate: rateVal,
-          cycleDay: cycleVal
-        }),
-        headers: { "Content-Type": "text/plain;charset=utf-8" }
-      });
-      syncStatus.innerText = "Settings synced with Google Sheet ✓";
-    } catch (err) {
-      console.error(err);
-      syncStatus.innerText = "Saved locally (Sheet sync failed)";
-    }
+  if (appState.settings.apiUrl && !appState.settings.apiUrl.includes("YOUR_DEPLOYMENT_ID")) {
+    syncStatus.innerText = currentLang === "mr" ? "सेटिंग्ज जतन होत आहेत..." : "Syncing settings...";
+    fetch(appState.settings.apiUrl, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "updateSettings",
+        rate: rateVal,
+        cycleDay: cycleVal
+      }),
+      headers: { "Content-Type": "text/plain;charset=utf-8" }
+    })
+    .then(() => {
+      syncStatus.innerText = currentLang === "mr" ? "सेटिंग्ज जतन झाल्या ✓" : "Settings synced ✓";
+    })
+    .catch(() => {
+      syncStatus.innerText = currentLang === "mr" ? "स्थानिक जतन केले" : "Saved locally";
+    });
   }
 }
 
-// Read from Google Sheets
 async function fetchFromSheet() {
-  if (!appState.settings.apiUrl) return;
+  if (!appState.settings.apiUrl || appState.settings.apiUrl.includes("YOUR_DEPLOYMENT_ID")) return;
 
-  syncStatus.innerText = "Syncing with Google Sheet...";
+  syncStatus.innerText = currentLang === "mr" ? "माहिती लोड होत आहे..." : "Syncing...";
   try {
     const res = await fetch(`${appState.settings.apiUrl}?action=getData`);
     const data = await res.json();
@@ -163,51 +301,36 @@ async function fetchFromSheet() {
     if (data.success) {
       appState.deliveries = data.deliveries || [];
       appState.settlements = data.settlements || [];
-      
-      // Sync settings from sheet
       if (data.settings) {
-        if (data.settings.rate) {
-          appState.settings.rate = Number(data.settings.rate);
-          document.getElementById("cfgRate").value = appState.settings.rate;
-        }
-        if (data.settings.cycleDay) {
-          appState.settings.cycleDay = Number(data.settings.cycleDay);
-          document.getElementById("cfgCycleDay").value = appState.settings.cycleDay;
-        }
+        if (data.settings.rate) appState.settings.rate = Number(data.settings.rate);
+        if (data.settings.cycleDay) appState.settings.cycleDay = Number(data.settings.cycleDay);
+        document.getElementById("cfgRate").value = appState.settings.rate;
+        document.getElementById("cfgCycleDay").value = appState.settings.cycleDay;
       }
       saveLocalState();
-      syncStatus.innerText = "Synced with Google Sheet ✓";
-    } else {
-      syncStatus.innerText = "Google Sheet error: " + (data.error || "Unknown");
+      syncStatus.innerText = currentLang === "mr" ? "गूगल शीट कनेक्ट झाले ✓" : "Synced with Google Sheet ✓";
     }
   } catch (err) {
     console.error(err);
-    syncStatus.innerText = "Offline (Using locally cached data)";
+    syncStatus.innerText = currentLang === "mr" ? "ऑफलाईन मोड" : "Offline Mode";
   }
   updateUI();
 }
 
-// Log delivery
 async function handleSaveEntry() {
   const date = logDateInput.value;
-  if (!date) {
-    alert("Please select a date.");
-    return;
-  }
+  if (!date) return;
 
   let qty = selectedPresetQty;
   if (customQtyInput.value !== "") {
     qty = parseFloat(customQtyInput.value);
   }
 
-  if (isNaN(qty) || qty < 0) {
-    alert("Please provide a valid milk quantity.");
-    return;
-  }
+  if (isNaN(qty) || qty < 0) return;
 
   const notes = logNotesInput.value.trim();
+  const t = translations[currentLang];
 
-  // Optimistic update locally
   const existingIdx = appState.deliveries.findIndex(d => d.date === date);
   if (existingIdx >= 0) {
     appState.deliveries[existingIdx].liters = qty;
@@ -226,44 +349,25 @@ async function handleSaveEntry() {
   saveLocalState();
   updateUI();
 
-  // Push to Google Sheets if connected
-  if (appState.settings.apiUrl) {
-    syncStatus.innerText = "Saving to Google Sheet...";
-    try {
-      await fetch(appState.settings.apiUrl, {
-        method: "POST",
-        body: JSON.stringify({
-          action: "logDelivery",
-          date: date,
-          liters: qty,
-          notes: notes
-        }),
-        headers: { "Content-Type": "text/plain;charset=utf-8" }
-      });
-      syncStatus.innerText = "Saved to Google Sheet ✓";
-    } catch (e) {
-      console.error(e);
-      syncStatus.innerText = "Saved locally (Sheet sync failed)";
-    }
+  if (appState.settings.apiUrl && !appState.settings.apiUrl.includes("YOUR_DEPLOYMENT_ID")) {
+    fetch(appState.settings.apiUrl, {
+      method: "POST",
+      body: JSON.stringify({ action: "logDelivery", date, liters: qty, notes }),
+      headers: { "Content-Type": "text/plain;charset=utf-8" }
+    });
   }
 
-  alert(`Logged ${qty} L for ${date}`);
+  alert(`${t.alertSaved}${qty} L (${date})`);
   logNotesInput.value = "";
 }
 
-// Calculate Bill Preview
 function handleCalculatePreview() {
   const cutoff = cutoffDateInput.value;
-  if (!cutoff) {
-    alert("Please choose a cutoff date.");
-    return;
-  }
+  if (!cutoff) return;
 
-  // Filter unbilled days up to cutoff
   const unbilled = appState.deliveries.filter(d => d.status === "unbilled" && d.date <= cutoff);
-
   if (unbilled.length === 0) {
-    alert("No unbilled entries found on or before " + cutoff);
+    alert(currentLang === "mr" ? "या तारखेपर्यंत कोणतीही बाकी नोंद नाही." : "No unbilled entries found up to this date.");
     return;
   }
 
@@ -274,11 +378,7 @@ function handleCalculatePreview() {
 
   unbilled.forEach(d => {
     totalLiters += Number(d.liters);
-    if (Number(d.liters) > 0) {
-      milkDays++;
-    } else {
-      skipDays++;
-    }
+    if (Number(d.liters) > 0) milkDays++; else skipDays++;
     if (d.date < earliestDate) earliestDate = d.date;
   });
 
@@ -286,8 +386,8 @@ function handleCalculatePreview() {
   const grandTotal = totalLiters * rate;
 
   document.getElementById("modalPeriod").innerText = `${earliestDate} → ${cutoff}`;
-  document.getElementById("modalMilkDays").innerText = `${milkDays} days`;
-  document.getElementById("modalSkipDays").innerText = `${skipDays} days`;
+  document.getElementById("modalMilkDays").innerText = `${milkDays} ${currentLang === 'mr' ? 'दिवस' : 'days'}`;
+  document.getElementById("modalSkipDays").innerText = `${skipDays} ${currentLang === 'mr' ? 'दिवस' : 'days'}`;
   document.getElementById("modalTotalLiters").innerText = `${totalLiters.toFixed(1)} L`;
   document.getElementById("modalRate").innerText = `₹${rate} / L`;
   document.getElementById("modalGrandTotal").innerText = `₹${grandTotal.toFixed(2)}`;
@@ -295,12 +395,11 @@ function handleCalculatePreview() {
   openModal(billModal);
 }
 
-// Mark Paid and Settle
 async function handleConfirmSettlement() {
   const cutoff = cutoffDateInput.value;
+  const t = translations[currentLang];
   closeModal(billModal);
 
-  // Locally mark as billed
   appState.deliveries.forEach(d => {
     if (d.status === "unbilled" && d.date <= cutoff) {
       d.status = "billed";
@@ -310,30 +409,19 @@ async function handleConfirmSettlement() {
   saveLocalState();
   updateUI();
 
-  if (appState.settings.apiUrl) {
-    syncStatus.innerText = "Settling bill in Google Sheet...";
-    try {
-      await fetch(appState.settings.apiUrl, {
-        method: "POST",
-        body: JSON.stringify({
-          action: "settleBill",
-          cutoffDate: cutoff,
-          rate: appState.settings.rate
-        }),
-        headers: { "Content-Type": "text/plain;charset=utf-8" }
-      });
-      fetchFromSheet();
-    } catch (e) {
-      console.error(e);
-      syncStatus.innerText = "Settled locally (Sheet update failed)";
-    }
+  if (appState.settings.apiUrl && !appState.settings.apiUrl.includes("YOUR_DEPLOYMENT_ID")) {
+    fetch(appState.settings.apiUrl, {
+      method: "POST",
+      body: JSON.stringify({ action: "settleBill", cutoffDate: cutoff, rate: appState.settings.rate }),
+      headers: { "Content-Type": "text/plain;charset=utf-8" }
+    }).then(() => fetchFromSheet());
   }
 
-  alert("Cycle successfully settled and marked as paid!");
+  alert(t.alertSettled);
 }
 
-// Render dynamic UI
 function updateUI() {
+  const t = translations[currentLang];
   const rate = appState.settings.rate || 65;
   const unbilled = appState.deliveries.filter(d => d.status === "unbilled");
 
@@ -350,32 +438,34 @@ function updateUI() {
   billRunningAmount.innerText = `₹${totalCost.toFixed(2)}`;
   billRunningLiters.innerText = `${totalLiters.toFixed(1)} L`;
   billRunningRate.innerText = `₹${rate} / L`;
-  billRunningDays.innerText = `${unbilled.length} Days`;
+  billRunningDays.innerText = `${unbilled.length} ${currentLang === 'mr' ? 'दिवस' : 'Days'}`;
 
   if (earliestDate) {
-    billPeriodLabel.innerText = `Unbilled deliveries since ${earliestDate}`;
+    billPeriodLabel.innerText = `${t.unbilledSince} ${earliestDate}`;
   } else {
-    billPeriodLabel.innerText = `All prior days settled (₹0 due)`;
+    billPeriodLabel.innerText = t.allSettled;
   }
 
-  // Render recent 8 logs
   const sorted = [...appState.deliveries].sort((a, b) => b.date.localeCompare(a.date));
-  logsCount.innerText = `${sorted.length} total`;
+  logsCount.innerText = `${sorted.length} ${currentLang === 'mr' ? 'एकूण' : 'total'}`;
 
   if (sorted.length === 0) {
-    recentLogsList.innerHTML = `<li class="empty-state">No deliveries recorded yet.</li>`;
+    recentLogsList.innerHTML = `<li class="empty-state">${t.noEntries}</li>`;
   } else {
-    recentLogsList.innerHTML = sorted.slice(0, 8).map(d => `
-      <li class="log-item">
-        <div class="log-info">
-          <div class="log-date">${d.date}</div>
-          <div class="log-tag-group">
-            <span class="badge badge-${d.status}">${d.status}</span>
-            ${d.notes ? `<span class="log-notes">• ${d.notes}</span>` : ""}
+    recentLogsList.innerHTML = sorted.slice(0, 8).map(d => {
+      const badgeText = d.status === "unbilled" ? t.badgeUnbilled : t.badgeBilled;
+      return `
+        <li class="log-item">
+          <div class="log-info">
+            <div class="log-date">${d.date}</div>
+            <div class="log-tag-group">
+              <span class="badge badge-${d.status}">${badgeText}</span>
+              ${d.notes ? `<span class="log-notes">• ${d.notes}</span>` : ""}
+            </div>
           </div>
-        </div>
-        <div class="log-liters">${Number(d.liters).toFixed(1)} L</div>
-      </li>
-    `).join("");
+          <div class="log-liters">${Number(d.liters).toFixed(1)} L</div>
+        </li>
+      `;
+    }).join("");
   }
 }
